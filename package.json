@@ -1,0 +1,26 @@
+{
+  "name": "mitm-agent",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lemonce3/mitm-agent.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/lemonce3/mitm-agent/issues"
+  },
+  "homepage": "https://github.com/lemonce3/mitm-agent#readme",
+  "dependencies": {
+    "iconv-lite": "^0.4.24",
+    "lru-cache": "^5.1.1",
+    "mitm": "git+ssh://git@github.com/lemonce3/mitm.git",
+    "pako": "^1.0.8"
+  }
+}
