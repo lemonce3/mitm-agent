@@ -1,6 +1,7 @@
+const mitm = require('./src');
 const LRU = require('lru-cache');
 const iconv = require('iconv-lite');
-const utils = require('../utils');
+const utils = require('./src/common/util');
 const pako = require('pako');
 
 const cache = new LRU({
@@ -21,9 +22,6 @@ function rewriteHtmlData(data) {
 
 	return rewrited;
 }
-
-
-const mitm = require('mitm');
 // process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
 const config = {
 	sslConnectInterceptor: (req, cltSocket, head) => {

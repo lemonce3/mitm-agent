@@ -18,9 +18,16 @@
   },
   "homepage": "https://github.com/lemonce3/mitm-agent#readme",
   "dependencies": {
+    "charset": "^1.0.1",
     "iconv-lite": "^0.4.24",
+    "jschardet": "^2.1.0",
     "lru-cache": "^5.1.1",
     "mitm": "git+ssh://git@github.com/lemonce3/mitm.git",
-    "pako": "^1.0.8"
+    "pako": "^1.0.8",
+    "through2": "^3.0.0",
+    "zlib": "^1.0.5"
+  },
+  "devDependencies": {
+    "pkg": "^4.3.7"
   }
 }

@@ -7,8 +7,8 @@
 		{
 			"type": "node",
 			"request": "launch",
-			"name": "Launch Program",
-			"program": "${workspaceFolder}/strategy/monitor.js"
+			"name": "Launch behavior",
+			"program": "${workspaceFolder}/strategy/behavior.js"
 		}
 	]
 }
