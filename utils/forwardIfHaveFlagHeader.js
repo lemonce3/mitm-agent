@@ -10,6 +10,8 @@ function forwardIfHasFlagHeader(reqOptions, flagHeaders, hostname, port, req, re
 	if (shouldNotForward) {
 		return callback => callback();
 	} else {
+		const clientAddress = req.connection.remoteAddress;
+		const clientPort = req.connection.remotePort;
 		reqOptions.hostname = hostname;
 		reqOptions.port = port;
 		const forwardReq = http.request(reqOptions, forwardRes => {
@@ -17,6 +19,8 @@ function forwardIfHasFlagHeader(reqOptions, flagHeaders, hostname, port, req, re
 			res.writeHead(forwardRes.statusCode);
 			forwardRes.pipe(res);
 		});
+		forwardReq.setHeader('client-address', clientAddress);
+		forwardReq.setHeader('client-port', clientPort);
 		req.pipe(forwardReq);
 
 		forwardReq.on('error', e => {

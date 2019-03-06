@@ -7,15 +7,17 @@ const {httpUtil, chunkReplace, forwardIfHaveFlagHeader, cloneResHeaders } = requ
 const { forwardServer, injection } = require(path.resolve(cwd, 'config.js'));
 
 const options = {
-	sslConnectInterceptor: (req, cltSocket, head) => {
+	sslConnectInterceptor: (req, clientSocket, head) => {
 		return true;
 	},
 	requestInterceptor: (rOptions, req, res, ssl, next) => {
-		console.log(`正在访问：${rOptions.protocol}//${rOptions.hostname}:${rOptions.port}`);
+		// console.log(`正在访问：${rOptions.protocol}//${rOptions.hostname}:${rOptions.port}`);
 
 		const flagHeaders = {
 			'lemonce-mitm': 'forward-action-data'
 		};
+
+		delete rOptions.headers['accept-encoding'];
 
 		forwardIfHaveFlagHeader(rOptions, flagHeaders, forwardServer.host, forwardServer.port, req, res)(next);
 	},
@@ -47,5 +49,9 @@ const options = {
 		next();
 	}
 };
+
+process.on('uncaughtException', function(err) {
+  console.log('Caught exception: ' + err);
+});
 
 mitm.createProxy(options);

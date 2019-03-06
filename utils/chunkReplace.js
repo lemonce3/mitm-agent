@@ -2,11 +2,19 @@
 var charset = require('charset');
 var iconv = require('iconv-lite');
 var jschardet = require('jschardet');
+const _ = require('lodash');
 
 const HEAD_REG = /(<head[\s\d\w="\\/-]*>)/i;
 
 function injectAfterHead(data, inject) {
-	const rewrited = data.replace(HEAD_REG, '$1' + inject);
+	const matchResult = data.match(HEAD_REG);
+	if (!matchResult) {
+		return data;
+	}
+	const afterInject = data.slice(matchResult.index + matchResult[0].length);
+	const beforeInject = data.split(afterInject)[0];
+	const rewrited = beforeInject + inject + afterInject;
+	// const rewrited = _.replace(data, HEAD_REG, '$1' + inject);
 
 	return rewrited;
 }
