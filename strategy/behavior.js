@@ -1,4 +1,3 @@
-const through = require('through2');
 const zlib = require('zlib');
 const mitm = require('mitm');
 const path = require('path');
@@ -23,35 +22,44 @@ const options = {
 	},
 	responseInterceptor: (req, res, proxyReq, proxyRes, ssl, next) => {
 		const isHtml = httpUtil.isHtml(proxyRes);
-		const contentLengthIsZero = (() => {
-			return proxyRes.headers['content-length'] == 0;
-		})();
-		if (!isHtml || contentLengthIsZero) {
+		if (!isHtml) {
 			next();
 		} else {
 			cloneResHeaders(proxyRes, res, isHtml);
-
 			res.writeHead(proxyRes.statusCode);
 
 			const isGzip = httpUtil.isGzip(proxyRes);
 
-			if (isGzip) {
-				proxyRes.pipe(new zlib.Gunzip())
-					.pipe(through(function (chunk, enc, callback) {
-						chunkReplace(this, chunk, enc, callback, injection, proxyRes);
-					})).pipe(new zlib.Gzip()).pipe(res);
-			} else {
-				proxyRes.pipe(through(function (chunk, enc, callback) {
-					chunkReplace(this, chunk, enc, callback, injection, proxyRes);
-				})).pipe(res);
-			}
+			let chunk = Buffer.from([]);
+
+			proxyRes.on('data', data => {
+				chunk = Buffer.concat([chunk, data], chunk.length + data.length);
+			});
+
+			proxyRes.on('end', (e) => {
+				if (isGzip) {
+					chunk = zlib.gunzip(chunk);
+				} else {
+					//do nothing
+				}
+	
+				chunk = chunkReplace(chunk, injection, proxyRes);
+
+				if (isGzip) {
+					chunk = zlib.gzip(chunk);
+				} else {
+					//do nothing
+				}
+
+				res.end(chunk);
+			});
 		}
 		next();
 	}
 };
 
 process.on('uncaughtException', function(err) {
-  console.log('Caught exception: ' + err);
+	console.log('Caught exception: ' + err);
 });
 
 mitm.createProxy(options);

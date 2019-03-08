@@ -5,8 +5,12 @@ var jschardet = require('jschardet');
 const _ = require('lodash');
 
 const HEAD_REG = /(<head[\s\d\w="\\/-]*>)/i;
+const DOCTYPE_REG = /<DOCTYPE/;
 
 function injectAfterHead(data, inject) {
+	if (!DOCTYPE_REG.test(data)) {
+		data = '<!DOCTYPE html>\r\n' + data;
+	}
 	const matchResult = data.match(HEAD_REG);
 	if (!matchResult) {
 		return data;
@@ -19,7 +23,7 @@ function injectAfterHead(data, inject) {
 	return rewrited;
 }
 
-function chunkReplace (_this, chunk, enc, callback, inject, proxyRes) {
+function chunkReplace (chunk, inject, proxyRes) {
 	const _charset = charset(proxyRes, chunk) || jschardet.detect(chunk).encoding.toLowerCase();
 	let chunkString;
 	if (_charset != null && _charset != 'utf-8') {
@@ -37,8 +41,7 @@ function chunkReplace (_this, chunk, enc, callback, inject, proxyRes) {
 		buffer = new Buffer(newChunkString);
 	}
 
-	_this.push(buffer);
-	callback();
+	return buffer;
 }
 
 module.exports = chunkReplace;
