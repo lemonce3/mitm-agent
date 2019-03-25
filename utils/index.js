@@ -1,4 +1,5 @@
 exports.httpUtil = require('./httpUtil');
-exports.forwardIfHaveFlagHeader = require('./forwardIfHaveFlagHeader')
+exports.forwardIfHaveFlagHeader = require('./forward');
 exports.chunkReplace = require('./chunkReplace');
-exports.cloneResHeaders = require('./cloneResHeaders');
+exports.cloneHeaders = require('./cloneHeaders');
+exports.multitypeHandler = require('./multitypeHandler');

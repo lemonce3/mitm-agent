@@ -1,11 +1,9 @@
 const http = require('http');
-const cloneResHeaders = require('./cloneResHeaders.js');
+const cloneHeaders = require('./cloneHeaders.js');
 
-function forwardIfHasFlagHeader(reqOptions, flagHeaders, hostname, port, req, res) {
+function forwardIfHasFlagHeader(reqOptions, hostname, port, req, res) {
 
-	const shouldNotForward = Object.keys(flagHeaders).some(key => {
-		return reqOptions.headers[key] !== flagHeaders[key];
-	});
+	
 
 	if (shouldNotForward) {
 		return callback => callback();
@@ -15,7 +13,7 @@ function forwardIfHasFlagHeader(reqOptions, flagHeaders, hostname, port, req, re
 		reqOptions.hostname = hostname;
 		reqOptions.port = port;
 		const forwardReq = http.request(reqOptions, forwardRes => {
-			cloneResHeaders(forwardRes, res, false);
+			cloneHeaders(forwardRes, res, false);
 			res.writeHead(forwardRes.statusCode);
 			forwardRes.pipe(res);
 		});

@@ -1824,11 +1824,10 @@
 		return $state.bodySnapshot;
 	}
 	
-	var sessionURL = 'api/page/behavior/session/';
-	var url = "".concat(sessionURL).concat(getSession(), "/snapshot/");
-	
 	function captureBody() {
-		$state.bodySnapshot = getSnapshot(window.top, '');
+		$state.bodySnapshot = getSnapshot(window.top, {
+			session: getSession()
+		});
 	}
 	
 	var state = new EventEmitter();
@@ -2393,45 +2392,98 @@
 		return $event.target || $event.srcElement;
 	}
 	
-	function getBodyHTMLText($document) {
-		return $document.body.outerHTML.replace(SCRIPT_REG, '').replace(STYLE_REG, '');
+	function getOuterHtmlListBySelector($document, selector) {
+		var elementList = $document.querySelectorAll(selector);
+		return _.map(elementList, function (element) {
+			return element.outerHTML;
+		});
 	}
 	
-	function getHeadHTMLText($document) {
-		return $document.getElementsByTagName('head')[0].outerHTML.replace(SCRIPT_REG, '').replace(LINK_REG, '').replace(STYLE_REG, '');
+	function handleStrList(origin, strList, handler, option) {
+		var result = origin;
+	
+		_.each(strList, function (str, index) {
+			return result = result.replace(str, handler(str, index, option));
+		});
+	
+		return result;
 	}
 	
-	function getHTMLText($document) {
-		var head = getHeadHTMLText($document);
-		var body = getBodyHTMLText($document); // const base = $document.baseURI;
-	
-		var title = $document.title;
-		var style = getStyleSheets($document);
-		return "<!DOCTYPE html><html><head><title>".concat(title, "</title><style type=\"text/css\">").concat(style, "</style></head>").concat(body, "</html>"); // return `<!DOCTYPE html><html><head><base href="${base}"/><title>${title}</title><style type="text/css">${style}</style></head>${body}</html>`;
+	function handleOuterHtmlBySelector($document, text, selector, handler, option) {
+		var strList = getOuterHtmlListBySelector($document, selector);
+		return handleStrList(text, strList, handler, option);
 	}
 	
-	function getSnapshot($window, preSrc) {
+	function getText($window, rules, option) {
+		var $document = $window.document;
+		var origin = $document.body.outerHTML;
+	
+		_.each(rules, function (rule) {
+			return origin = handleOuterHtmlBySelector($document, origin, rule.selector, rule.handler, option);
+		});
+	
+		return origin;
+	}
+	
+	function getHTML($window, rules, option) {
+		var base = $window.document.baseURI;
+		var title = $window.document.title;
+		var body = getText($window, rules, option);
+		var style = getStyleSheets($window);
+		return "<!DOCTYPE html><html><head><base href=\"".concat(base, "\"/><title>").concat(title, "</title><style type=\"text/css\">").concat(style, "</style></head>").concat(body, "</html>");
+	}
+	
+	function snapshot($window, rules, option) {
 		var result = {};
 	
 		if ($window.self === $window.top) {
 			var now = Date.now().toString();
+			option.preSrc = 'root';
 			result.time = now;
 		}
 	
-		result.self = getHTMLText($window.document);
-		var iframeList = $window.document.querySelectorAll('iframe');
+		result.self = getHTML($window, rules, option);
 	
-		if (iframeList.length !== 0) {
-			_.each(iframeList, function (iframe, index) {
-				var outerHTML = iframe.outerHTML;
-				var src = preSrc === '' ? index : "".concat(preSrc, "-").concat(index);
-				var newOuterHTML = replaceSnapshotSrc(outerHTML, src);
-				result.self = result.self.replace(outerHTML, newOuterHTML);
-				result[index] = getSnapshot(iframe.contentWindow, src);
-			});
-		}
+		var iframeWindowList = _.map($window.document.querySelectorAll('iframe,frame'), function (iframe) {
+			return iframe.contentWindow;
+		});
+	
+		_.each(iframeWindowList, function (iframeWindow, index) {
+			return result[index] = snapshot(iframeWindow, rules, option);
+		});
 	
 		return result;
+	}
+	
+	function replaceSnapshotSrc(html, newSrc) {
+		return html.replace(SRC_REG, "src=\"".concat(newSrc, "\""));
+	}
+	
+	function frameHandler(iframe, index, option) {
+		var preSrc = option.preSrc;
+		var staticURL = option.staticURL;
+		var outerHTML = iframe.outerHTML;
+		var src = "".concat(staticURL).concat(preSrc, "-").concat(index);
+		var newOuterHTML = replaceSnapshotSrc(outerHTML, src);
+		return newOuterHTML;
+	}
+	
+	function getSnapshot($window, option) {
+		var rules = [{
+			selector: 'style,script,link[rel=stylesheet]',
+			handler: function handler() {
+				return '';
+			}
+		}, {
+			selector: 'iframe,frame',
+			handler: frameHandler
+		}];
+		var hostname = 'localhost';
+		var port = '8888';
+		var staticBase = "http://".concat(hostname, ":").concat(port);
+		var sessionURL = 'api/page/behavior/session/';
+		option.staticURL = "".concat(staticBase).concat(sessionURL).concat(option.session, "/snapshot/");
+		return snapshot($window, rules, option);
 	}
 	
 	function addEventListener(element, eventType, listener) {
@@ -2448,9 +2500,6 @@
 	exports.searchLabel = searchLabel;
 	exports.getTextSlice = getTextSlice;
 	exports.islinkedAnchor = islinkedAnchor;
-	exports.getBodyHTMLText = getBodyHTMLText;
-	exports.getHeadHTMLText = getHeadHTMLText;
-	exports.getHTMLText = getHTMLText;
 	exports.getSnapshot = getSnapshot;
 	exports.getTarget = getTarget;
 	exports.addEventListener = addEventListener;
@@ -2794,8 +2843,6 @@
 	addEventListener(window, 'unload', function () {
 		$analyser.release();
 	});
-	var sessionURL = 'api/page/behavior/session/';
-	var url = "".concat(sessionURL).concat(getSession(), "/snapshot/");
 	addEventListener(window, 'load', function () {
 		if (window.self !== window.top) {
 			return;
@@ -2804,7 +2851,9 @@
 				location: window.location,
 				title: document.title,
 				referrer: document.referrer,
-				snapshot: getSnapshot(window.top, '')
+				snapshot: getSnapshot(window.top, {
+					session: getSession()
+				})
 			});
 		}
 	});
