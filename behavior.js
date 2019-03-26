@@ -1,24 +1,23 @@
 const zlib = require('zlib');
 const mitm = require('mitm');
 const path = require('path');
-const formidable = require('formidable');
 
-const cwd = process.cwd();
-const { httpUtil, chunkReplace, forward, cloneResHeaders, multitypeHandler } = require('./utils');
-const { trackerServer, injection } = require(path.resolve(cwd, 'config.js'));
-
-let count = 0;
+const { httpUtil, chunkReplace, forward, cloneHeaders, multitypeMock } = require('./utils');
+const { trackerServer, injection } = require(path.resolve('config.js'));
 
 const options = {
 	sslConnectInterceptor: (clientRequest, clientSocket, head) => {
-		return true;
+		return false;
 	},
-	requestInterceptor: (clientRequestOptions, clientRequest, clientResponse, ssl, next) => {
+	requestInterceptor: async function (clientRequestOptions, clientRequest, clientResponse, ssl, next) {
 		// console.log(`正在访问：${rOptions.protocol}//${rOptions.hostname}:${rOptions.port}`);
-		if (clientRequestOptions.headers['lemonce-mock-file']) {
-			multitypeHandler(clientRequestOptions, clientRequest, clientResponse);
+		const contentType = clientRequestOptions.headers['content-type'];
+		if (contentType && contentType.includes('multipart')) {
+			await multitypeMock(clientRequestOptions, clientRequest, clientResponse);
+			return;
 		} else {
 			//do nothing
+			next();
 		}
 		const forwardRules = [
 			{
@@ -41,7 +40,7 @@ const options = {
 		if (!isHtml) {
 			next();
 		} else {
-			cloneResHeaders(proxyRes, res, isHtml);
+			cloneHeaders(proxyRes, res, isHtml);
 			res.writeHead(proxyRes.statusCode);
 
 			const isGzip = httpUtil.isGzip(proxyRes);
