@@ -2,8 +2,6 @@ const http = require('http');
 const formidable = require('formidable');
 const FormData = require('form-data');
 const StringDecoder = require('string_decoder').StringDecoder;
-const cloneHeaders = require('./cloneHeaders.js');
-const { resourceServer } = require('../config');
 const _ = require('lodash');
 
 const IncomingForm = formidable.IncomingForm;
@@ -73,7 +71,7 @@ function parserForm(request) {
 	});
 }
 
-function getFileList(mockInfo) {
+function getFileList(mockInfo, resourceServer) {
 	return Promise.all(mockInfo.map(fileInfo => {
 		const { field, filename, contentType } = fileInfo;
 
@@ -106,65 +104,43 @@ function getFileList(mockInfo) {
 	}));
 }
 
-const MOCK_INFO_FIELD = '_lemonce_mock_';
-
-module.exports = async function multitypeHandler(clientRequestOptions, clientRequest, clientResponse) {
+module.exports = async function multitypeHandler(ctx, options) {
 	const form = new IncomingForm();
 	form.multiples = true;
 	form.files = [];
 
-	const boundary = clientRequestOptions.headers['content-type'].match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+	const boundary = ctx.request.options.headers['content-type'].match(/boundary=(?:"([^"]+)"|([^;]+))/i);
 	const formData = new FormData({ _boundary: boundary[1] || boundary[2] });
 
-	let body = Buffer.from([]);
-	clientRequest.on('data', data => body = Buffer.concat([body, data], body.length + data.length));
+	let originBody = Buffer.from([]);
+	ctx.request.body.on('data', data => originBody = Buffer.concat([originBody, data], originBody.length + data.length));
 
-	const { fields } = await parserForm(clientRequest);
+	const { fields } = await parserForm(ctx.request.body);
 
-	const mockInfo = fields[MOCK_INFO_FIELD];
+	const mockInfo = fields[options.mockInfoField];
 
 	if (!mockInfo) {
-		return new Promise((resolve, reject) => {
-			const forwardRequest = http.request(clientRequestOptions, forwardResponse => {
-				forwardResponse.pipe(clientResponse);
-				resolve(false);
-			});
-
-			forwardRequest.on('error', error => reject(error));
-	
-			forwardRequest.end(body);
-		});
+		return {
+			options: ctx.request.options,
+			body: originBody
+		};
 	}
 
-	delete fields[MOCK_INFO_FIELD];
+	delete fields[options.mockInfoField];
 	
 	_.forEach(fields, (value, key) => {
 		formData.append(key, value);
 	});
 
-	const fileList = await getFileList(JSON.parse(mockInfo));
+	const fileList = await getFileList(JSON.parse(mockInfo), options.resourceServer);
 
 	fileList.forEach(file => formData.append(file.field, file.buffer, file.option));
 
-	clientRequestOptions.headers['content-type'] = formData.getHeaders()['content-type'];
-	delete clientRequestOptions.headers['content-length'];
+	ctx.request.options.headers['content-type'] = formData.getHeaders()['content-type'];
+	delete ctx.request.options.headers['content-length'];
 
-	return new Promise((resolve, reject) => {
-		const mockRequest = http.request(clientRequestOptions);
-		
-		mockRequest.on('response', mockResponse => {
-			let result = Buffer.from([]);
-			mockResponse.on('data', data => result = Buffer.concat([result, data], result.length + data.length));
-			mockResponse.on('end', () => {
-				cloneHeaders(mockResponse, clientResponse, false);
-				clientResponse.writeHead(mockResponse.statusCode);
-				clientResponse.end(result);
-				resolve(true);
-			});
-		});
-		
-		mockRequest.on('error', error => reject(error));
-		
-		formData.pipe(mockRequest);
-	});
+	return {
+		options: ctx.request.options,
+		body: formData
+	};
 };
