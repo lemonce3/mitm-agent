@@ -52,12 +52,13 @@ IncomingForm.prototype.handlePart = function handlePart(part) {
 	});
 
 	part.on('end', function () {
-		self.emit('file', file.name, file);
+		self.emit('file', part.name, file);
 	});
 };
 
 function parserForm(request) {
 	const form = new IncomingForm();
+	form.multiples = true;
 	form.files = [];
 
 	return new Promise((resolve, reject) => {
@@ -72,11 +73,22 @@ function parserForm(request) {
 }
 
 function getFileList(mockInfo, resourceServer) {
+	const fileList = [];
+	_.forEach(mockInfo, (file, field) => {
+		file.forEach(file => {
+			fileList.push({
+				field,
+				filename: file.name,
+				hash: file.hash
+			});
+		});
+	});
+
 	return Promise.all(mockInfo.map(fileInfo => {
-		const { field, filename, contentType } = fileInfo;
+		const { field, filename, hash } = fileInfo;
 
 		return new Promise((resolve, reject) => {
-			const url = `http://${resourceServer.host}:${resourceServer.port}${resourceServer.apiPrefix || '/'}${filename}`;
+			const url = `${resourceServer.protocol}//${resourceServer.host}:${resourceServer.port}/${resourceServer.apiPrefix}${hash}`;
 			const req = http.request(url, res => {
 				let result = Buffer.from([]);
 				const contentLength = res.headers['content-length'];
@@ -88,7 +100,7 @@ function getFileList(mockInfo, resourceServer) {
 						buffer: result,
 						option: {
 							filename,
-							contentType: contentType || res.headers['content-type'],
+							contentType: res.headers['content-type'],
 							knownLength: contentLength
 						}
 					};

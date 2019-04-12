@@ -1,9 +1,7 @@
 const zlib = require('zlib');
-const path = require('path');
 
 const bodyReplace = require('./body-replace');
 const multitypeMock = require('./multitype-mock');
-const { trackerServer, injection } = require(path.resolve('config.js'));
 
 const httpUtil = {
 	isHtml(headers) {
