@@ -84,11 +84,11 @@ function getFileList(mockInfo, resourceServer) {
 		});
 	});
 
-	return Promise.all(mockInfo.map(fileInfo => {
+	return Promise.all(fileList.map(fileInfo => {
 		const { field, filename, hash } = fileInfo;
 
 		return new Promise((resolve, reject) => {
-			const url = `${resourceServer.protocol}//${resourceServer.host}:${resourceServer.port}/${resourceServer.apiPrefix}${hash}`;
+			const url = `${resourceServer.protocol}//${resourceServer.host}:${resourceServer.port}${resourceServer.apiPrefix}/${hash}`;
 			const req = http.request(url, res => {
 				let result = Buffer.from([]);
 				const contentLength = res.headers['content-length'];

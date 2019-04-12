@@ -8,11 +8,23 @@ module.exports = {
 	forward: {
 		rules: [
 			{
-				name: 'tracker',
-				headerKey: 'lemonce-mitm',
-				headerValue: 'forward-action-data',
+				name: 'observer',
 				host: '127.0.0.1',
-				port: 8888,
+				port: 8080,
+				check(ctx) {
+					const headerKey = 'x-observer-forward';
+					const headerValue = 'yes';
+					
+					if (ctx.request.options.headers[headerKey] === headerValue) {
+						return true;
+					}
+
+					if (ctx.request.options.path.includes('agent.html')) {
+						return true;
+					}
+
+					return false;
+				},
 				handler(requestOptions, body) {
 					requestOptions.host = this.host;
 					requestOptions.port = this.port;
@@ -26,6 +38,7 @@ module.exports = {
 	multitypeMock: {
 		mockInfoField: '_lemonce_mock_',
 		resourceServer: {
+			protocol: 'http:',
 			host: 'localhost',
 			port: 3000,
 			apiPrefix: '/'

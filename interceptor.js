@@ -43,7 +43,7 @@ module.exports = function interceptorFactory(interceptorOptions) {
 			const forwardRules = interceptorOptions.forward.rules;
 
 			if (forwardRules) {
-				const activeRule = forwardRules.find(rule => options.headers[rule.headerKey] === rule.headerValue);
+				const activeRule = forwardRules.find(rule => rule.check(ctx));
 	
 				if (activeRule) {
 					activeRule.handler(options, ctx.request.body);
