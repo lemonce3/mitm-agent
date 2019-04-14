@@ -2,9 +2,10 @@ const zlib = require('zlib');
 
 const bodyReplace = require('./body-replace');
 const multitypeMock = require('./multitype-mock');
+// const HTML_REG = //;
 
 const httpUtil = {
-	isHtml(headers) {
+	isHtmlHeader(headers) {
 		const contentType = headers['content-type'];
 		return (typeof contentType != 'undefined') && /text\/html|application\/xhtml\+xml/.test(contentType);//TODO: jsonp
 	},
@@ -26,10 +27,10 @@ function getReadableData(readableStream) {
 
 module.exports = function InterceptorFactory(interceptorOptions) {
 	return {
-		sslConnect: async function (clientRequest, socket, head) {
+		async sslConnect(clientRequest, socket, head) {
 			return interceptorOptions.sslIntercept;
 		},
-		request: async function (ctx, respond, forward) {
+		async request(ctx, respond, forward) {
 			const options = ctx.request.options;
 			delete options.headers['accept-encoding'];
 			const contentType = options.headers['content-type'];
@@ -44,7 +45,7 @@ module.exports = function InterceptorFactory(interceptorOptions) {
 
 			if (forwardRules) {
 				const activeRule = forwardRules.find(rule => rule.check(ctx));
-	
+
 				if (activeRule) {
 					activeRule.handler(options, ctx.request.body);
 				}
@@ -52,16 +53,13 @@ module.exports = function InterceptorFactory(interceptorOptions) {
 
 			forward();
 		},
-		response: async function (ctx, respond) {
-			const { headers, body } = ctx.response;
-			const isHtml = httpUtil.isHtml(headers);
+		async response(ctx, respond) {
+			const { headers } = ctx.response;
 
-			if (!isHtml) {
-				respond();
-			} else {
+			if (httpUtil.isHtmlHeader(headers)) {
 				const isGzip = httpUtil.isGzip(headers);
 
-				let bodyData = await getReadableData(body);
+				let bodyData = await getReadableData(ctx.responseBody);
 
 				if (isGzip) {
 					bodyData = zlib.gunzip(bodyData);
@@ -69,17 +67,31 @@ module.exports = function InterceptorFactory(interceptorOptions) {
 					//do nothing
 				}
 
-				bodyData = bodyReplace(bodyData, interceptorOptions.bodyReplace.inject, headers);
+				try {
+					bodyData = await bodyReplace(bodyData, interceptorOptions.bodyReplace.inject, headers);
 
-				if (isGzip) {
-					bodyData = zlib.gzip(bodyData);
-				} else {
-					//do nothing
+					if (isGzip) {
+						bodyData = zlib.gzip(bodyData);
+					}
+
+					ctx.setResponse({
+						body: bodyData
+					});
+				} catch (error) {
+					ctx.setResponse({
+						statusCode: 418,
+						body: 'I could not understand your document. :(  --by man in teapot middle',
+						headers(origin) {
+							origin['content-type'] = 'text/plain';
+							return origin;
+						}
+					});
 				}
 
-				ctx.response.body = bodyData;
-				respond();
+
 			}
+
+			respond();
 		}
 	};
 };
