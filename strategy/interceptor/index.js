@@ -47,7 +47,7 @@ module.exports = function InterceptorFactory(interceptorOptions) {
 				const activeRule = forwardRules.find(rule => rule.check(ctx));
 
 				if (activeRule) {
-					activeRule.handler(options, ctx.request.body);
+					activeRule.handler(ctx);
 				}
 			}
 
@@ -55,6 +55,10 @@ module.exports = function InterceptorFactory(interceptorOptions) {
 		},
 		async response(ctx, respond) {
 			const { headers } = ctx.response;
+
+			if (ctx.activeRule) {
+				return respond();
+			}
 
 			if (httpUtil.isHtmlHeader(headers)) {
 				const isGzip = httpUtil.isGzip(headers);
@@ -87,8 +91,6 @@ module.exports = function InterceptorFactory(interceptorOptions) {
 						}
 					});
 				}
-
-
 			}
 
 			respond();

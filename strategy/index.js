@@ -3,8 +3,6 @@ const mitm = require('@lemonce3/mitm');
 const htmlparser2 = require('htmlparser2');
 const InterceptorFactory = require('./interceptor');
 
-const script = fs.readFileSync('../../../gitee.com/shit-ie8-agent/dist/inject.js');
-const scriptStr = `<script>\r\n${script}\r\n</script>`;
 const HEAD_REG = /<head[\s\d\w="\\/-]*>/i;
 
 function isHTML(data) {
@@ -36,24 +34,27 @@ function isHTML(data) {
 	});
 }
 
-async function injectAfterHead(data) {
-	if (!await isHTML(data)) {
-		return;
-	}
-
-	const matchResult = data.match(HEAD_REG);
-	if (!matchResult) {
-		return data;
-	}
-
-	const { index, input } = matchResult;
-	const offset = index + matchResult[0].length;
-
-	return input.substr(0, offset) + scriptStr + input.substr(offset);
-}
 
 module.exports = function StrategyFactory(options) {
+	async function injectAfterHead(data) {
+		if (!await isHTML(data)) {
+			return;
+		}
+	
+		const matchResult = data.match(HEAD_REG);
+		if (!matchResult) {
+			return data;
+		}
+	
+		const { index, input } = matchResult;
+		const offset = index + matchResult[0].length;
+	
+		return input.substr(0, offset) + scriptStr + input.substr(offset);
+	}
+
 	const { protocol, hostname, port } = new URL(options.observer);
+	const script = fs.readFileSync('./bundle.js');
+	const scriptStr = `<script>\r\nwindow.__OBSERVER_URL__='//${hostname}:${port}';${script}\r\n</script>`;
 
 	const interceptorOptions = {
 		sslIntercept: true,
@@ -73,15 +74,16 @@ module.exports = function StrategyFactory(options) {
 						}
 
 						if (ctx.request.options.path.includes('agent.html')) {
+							ctx.activeRule = 1;
 							return true;
 						}
 
 						return false;
 					},
-					handler(requestOptions, body) {
-						requestOptions.protocol = this.protocol;
-						requestOptions.host = this.host;
-						requestOptions.port = this.port;
+					handler(ctx) {
+						ctx.request.options.protocol = this.protocol;
+						ctx.request.options.host = this.host;
+						ctx.request.options.port = this.port;
 					}
 				}
 			]

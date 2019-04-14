@@ -64,4 +64,4 @@ typings/
 /cert
 config.js
 dev-cert.json
-inject.js
+bundle.js
