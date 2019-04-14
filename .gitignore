@@ -63,4 +63,5 @@ typings/
 /.vscode
 /cert
 config.js
-behavior
+dev-cert.json
+inject.js

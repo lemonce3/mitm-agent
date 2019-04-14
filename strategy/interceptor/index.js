@@ -6,11 +6,11 @@ const multitypeMock = require('./multitype-mock');
 const httpUtil = {
 	isHtml(headers) {
 		const contentType = headers['content-type'];
-		return (typeof contentType != 'undefined') && /text\/html|application\/xhtml\+xml/.test(contentType);
+		return (typeof contentType != 'undefined') && /text\/html|application\/xhtml\+xml/.test(contentType);//TODO: jsonp
 	},
 	isGzip(headers) {
 		const contentEncoding = headers['content-encoding'];
-		return !!(contentEncoding && contentEncoding.toLowerCase() == 'gzip');
+		return contentEncoding ? contentEncoding.toLowerCase() === 'gzip' : false;
 	}
 };
 
@@ -24,12 +24,12 @@ function getReadableData(readableStream) {
 	});
 }
 
-module.exports = function interceptorFactory(interceptorOptions) {
+module.exports = function InterceptorFactory(interceptorOptions) {
 	return {
 		sslConnect: async function (clientRequest, socket, head) {
 			return interceptorOptions.sslIntercept;
 		},
-		request: async function (ctx, forward, respond) {
+		request: async function (ctx, respond, forward) {
 			const options = ctx.request.options;
 			delete options.headers['accept-encoding'];
 			const contentType = options.headers['content-type'];
