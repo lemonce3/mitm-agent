@@ -3,7 +3,8 @@ const StrategyFactory = require('./strategy');
 
 module.exports = function createMitm(server, options) {
 	const { observer, resourceServer, ssl, certificateStore } = options;
-	const strategy = StrategyFactory({ observer, resourceServer });
+	const { rootCA, sslIntercept } = ssl;
+	const strategy = StrategyFactory({ observer, sslIntercept });
 	
-	return mitm.Server.create(strategy, { server, ssl, certificateStore });
+	return mitm.Server.create(strategy, { server, ssl: rootCA, certificateStore });
 };

@@ -72,7 +72,7 @@ function parserForm(request) {
 	});
 }
 
-function getFileList(mockInfo, resourceServer) {
+function getFileList(mockInfo, observer) {
 	const fileList = [];
 	_.forEach(mockInfo, (file, field) => {
 		file.forEach(file => {
@@ -88,7 +88,7 @@ function getFileList(mockInfo, resourceServer) {
 		const { field, filename, hash } = fileInfo;
 
 		return new Promise((resolve, reject) => {
-			const url = `${resourceServer.protocol}//${resourceServer.host}:${resourceServer.port}${resourceServer.apiPrefix}/${hash}`;
+			const url = `${observer.protocol}//${observer.hostname}:${observer.port}${observer.apiPrefix}/${hash}`;
 			const req = http.request(url, res => {
 				let result = Buffer.from([]);
 				const contentLength = res.headers['content-length'];
@@ -144,7 +144,7 @@ module.exports = async function multitypeHandler(ctx, options) {
 		formData.append(key, value);
 	});
 
-	const fileList = await getFileList(JSON.parse(mockInfo), options.resourceServer);
+	const fileList = await getFileList(JSON.parse(mockInfo), options.observerOptions);
 
 	fileList.forEach(file => formData.append(file.field, file.buffer, file.option));
 
