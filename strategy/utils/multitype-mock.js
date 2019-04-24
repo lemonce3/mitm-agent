@@ -72,7 +72,7 @@ function parserForm(request) {
 	});
 }
 
-function getFileList(mockInfo, observer) {
+function getFileList(mockInfo, resourceServer) {
 	const fileList = [];
 	_.forEach(mockInfo, (file, field) => {
 		file.forEach(file => {
@@ -88,7 +88,7 @@ function getFileList(mockInfo, observer) {
 		const { field, filename, hash } = fileInfo;
 
 		return new Promise((resolve, reject) => {
-			const url = `${observer.protocol}//${observer.hostname}:${observer.port}${observer.apiPrefix}/${hash}`;
+			const url = `${resourceServer.protocol}//${resourceServer.hostname}:${resourceServer.port}${resourceServer.apiMockFilePrefix}/${hash}`;
 			const req = http.request(url, res => {
 				let result = Buffer.from([]);
 				const contentLength = res.headers['content-length'];
@@ -121,7 +121,7 @@ module.exports = async function multitypeHandler(ctx, options) {
 	form.multiples = true;
 	form.files = [];
 
-	const boundary = ctx.request.options.headers['content-type'].match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+	const boundary = ctx.request.headers['content-type'].match(/boundary=(?:"([^"]+)"|([^;]+))/i);
 	const formData = new FormData({ _boundary: boundary[1] || boundary[2] });
 
 	let originBody = Buffer.from([]);
@@ -144,12 +144,12 @@ module.exports = async function multitypeHandler(ctx, options) {
 		formData.append(key, value);
 	});
 
-	const fileList = await getFileList(JSON.parse(mockInfo), options.observerOptions);
+	const fileList = await getFileList(JSON.parse(mockInfo), options.resourceServer);
 
 	fileList.forEach(file => formData.append(file.field, file.buffer, file.option));
 
-	ctx.request.options.headers['content-type'] = formData.getHeaders()['content-type'];
-	delete ctx.request.options.headers['content-length'];
+	ctx.request.headers['content-type'] = formData.getHeaders()['content-type'];
+	delete ctx.request.headers['content-length'];
 
 	return {
 		options: ctx.request.options,

@@ -2,9 +2,9 @@ const mitm = require('@lemonce3/mitm');
 const StrategyFactory = require('./strategy');
 
 module.exports = function createMitm(server, options) {
-	const { observer, resourceServer, ssl, certificateStore } = options;
-	const { rootCA, sslIntercept } = ssl;
-	const strategy = StrategyFactory({ observer, sslIntercept });
+	const { observer, ssl, certificateStore, log } = options;
+	const { rootCA, enableIntercept } = ssl;
+	const strategy = StrategyFactory({ observer: new URL(observer), enableIntercept });
 	
-	return mitm.Server.create(strategy, { server, ssl: rootCA, certificateStore });
+	return mitm.Server.create(mitm.Strategy.create(strategy), { server, ssl: rootCA, certificateStore, log });
 };

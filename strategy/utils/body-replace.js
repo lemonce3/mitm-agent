@@ -35,10 +35,12 @@ function isHTML(data) {
 	});
 }
 
-async function injectAfterHead(data, inject) {
+async function injectAfterHead(data, injection) {
 	if (!await isHTML(data)) {
-		return;
+		return data;
 	}
+
+	// console.log('body', data);
 
 	const matchResult = data.match(HEAD_REG);
 	if (!matchResult) {
@@ -48,13 +50,17 @@ async function injectAfterHead(data, inject) {
 	const { index, input } = matchResult;
 	const offset = index + matchResult[0].length;
 
-	return input.substr(0, offset) + inject + input.substr(offset);
+	return input.substr(0, offset) + injection + input.substr(offset);
+	// return input.substr(0, offset) + '<!-- hhhh -->' + input.substr(offset);
+	// return input;
 }
+
+const UTF_8_REG = /utf-?8/i;
 
 async function bodyReplace(target, injection, headers) {
 	const bodyCharset = charset(headers, target) || jschardet.detect(target).encoding.toLowerCase();
-	const notUTF8 = bodyCharset !== null && bodyCharset !== 'utf-8';
-
+	const notUTF8 = bodyCharset !== null && !UTF_8_REG.test(bodyCharset);
+	
 	if (notUTF8) {
 		const body = iconv.decode(target, bodyCharset);
 		const newBody = await injectAfterHead(body, injection);
@@ -62,7 +68,8 @@ async function bodyReplace(target, injection, headers) {
 	} else {
 		const body = target.toString();
 		const newBody = await injectAfterHead(body, injection);
-		return new Buffer(newBody);
+		// console.log(headers);
+		return Buffer.from(newBody);
 	}
 }
 

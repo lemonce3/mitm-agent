@@ -4,8 +4,7 @@ const path = require('path');
 const bodyReplace = require('./utils/body-replace');
 const multitypeMock = require('./utils/multitype-mock');
 
-const script = fs.readFileSync(path.resolve('inject.js'));
-const scriptStr = `<script>\r\n${script}\r\n</script>`;
+const script = fs.readFileSync(path.resolve('bundle.js'));
 
 const httpUtil = {
 	isHtmlHeader(headers) {
@@ -28,22 +27,22 @@ function getReadableData(readableStream) {
 	});
 }
 
-module.exports = function InterceptorFactory(options) {
-	const { observer } = options;
+module.exports = function StrategyFactory({ observer, enableIntercept }) {
+	const scriptStr = `<script>\r\nwindow.__OBSERVER_URL__='//${observer.hostname}:${observer.port}';${script}\r\n</script>`;
+
 	return {
 		async sslConnect(clientRequest, socket, head) {
-			return options.sslIntercept;
+			return enableIntercept;
 		},
 		async request(context, respond, forward) {
-			const options = context.request.options;
-			delete options.headers['accept-encoding'];
-			const contentType = options.headers['content-type'];
+			const { headers } = context.request;
+			const contentType = headers['content-type'];
 			// console.log(`正在访问：${options.protocol}//${options.hostname}:${options.port}`);
 
 			if (contentType && contentType.includes('multipart')) {
 				const mock = await multitypeMock(context, {
 					mockInfoField: '_lemonce_mock_',
-					observerOptions: observer
+					rescoureServer: Object.assign({}, observer, { apiMockFilePrefix: '/api/file' })
 				});
 
 				context.request.body = mock.body;
@@ -60,16 +59,39 @@ module.exports = function InterceptorFactory(options) {
 						const headerKey = 'x-observer-forward';
 						const headerValue = 'yes';
 
-						if (context.request.options.headers[headerKey] === headerValue) {
+						if (context.request.headers[headerKey] === headerValue) {
 							return true;
 						}
 
 						return false;
 					},
-					handler(requestOptions, body) {
-						requestOptions.protocol = this.protocol;
-						requestOptions.host = this.host;
-						requestOptions.port = this.port;
+					handler(context) {
+						context.request.protocol = this.protocol;
+						context.request.url.hostname = this.host;
+						context.request.url.port = this.port;
+					}
+				},
+				{
+					name: 'tracker-forward',
+					protocol: 'http:',
+					host: 'localhost',
+					port: 8888,
+					test(context) {
+						const headerKey = 'lemonce-mitm';
+						const headerValue = 'forward-action-data';
+
+						if (context.request.headers[headerKey] === headerValue) {
+							return true;
+						}
+
+						return false;
+					},
+					handler(context) {
+						context.request.headers['client-address'] = 'localhost';
+						context.request.headers['user-agent'] = 'aeou';
+						context.request.protocol = this.protocol;
+						context.request.url.hostname = this.host;
+						context.request.url.port = this.port;
 					}
 				},
 				{
@@ -78,43 +100,49 @@ module.exports = function InterceptorFactory(options) {
 					host: observer.hostname,
 					port: observer.port,
 					test(context) {
-						if (context.request.options.path.includes('agent.html')) {
+						if (context.request.url.pathname.includes('agent.html')) {
 							context.activeRule = this.name;
 							return true;
 						}
 
 						return false;
 					},
-					handler(ctx) {
-						ctx.request.options.protocol = this.protocol;
-						ctx.request.options.host = this.host;
-						ctx.request.options.port = this.port;
+					handler(context) {
+						context.request.url.protocol = this.protocol;
+						context.request.url.hostname = this.host;
+						context.request.url.port = this.port;
 					}
 				}
 			];
 
 			forwardRules.forEach(rule => {
 				if (rule.test(context)) {
-					rule.handler(options, context.request.body);
+					rule.handler(context);
 				}
 			});
 
 			forward();
 		},
 		async response(context, respond) {
-			const { headers } = context.response;
-
+			const { headers, statusCode } = context.response;
+			
+			if (statusCode >= 300 && statusCode < 400) {
+				return respond();
+			}
+			
 			if (!httpUtil.isHtmlHeader(headers)) {
 				return respond();
 			}
-
+			
 			if (context.activeRule === 'fetch-agent') {
 				return respond();
 			}
-
+			
 			const isGzip = httpUtil.isGzip(headers);
-
-			let bodyData = await getReadableData(context.responseBody);
+			
+			// return respond();
+			let bodyData = await getReadableData(context.response.body);
+			
 
 			if (isGzip) {
 				bodyData = zlib.gunzip(bodyData);
@@ -122,21 +150,17 @@ module.exports = function InterceptorFactory(options) {
 
 			try {
 				bodyData = await bodyReplace(bodyData, scriptStr, headers);
-
+				// const a = Buffer.from('');
+				// bodyData = Buffer.concat([bodyData, a], bodyData.length + a.length);
 				if (isGzip) {
 					bodyData = zlib.gzip(bodyData);
 				}
 
 				context.response.body = bodyData;
 			} catch (error) {
-				context.setResponse({
-					statusCode: 418,
-					body: 'I could not understand your document. :(  --by man in teapot middle',
-					headers(origin) {
-						origin['content-type'] = 'text/plain';
-						return origin;
-					}
-				});
+				context.response.statusCode = 418;
+				context.response.headers['content-type'] = 'text/plain';
+				context.response.body = 'I could not understand your document. :(  --by man in teapot middle';
 			}
 
 			respond();
