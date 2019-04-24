@@ -1,8 +1,8 @@
 const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
-const bodyReplace = require('./utils/body-replace');
-const multitypeMock = require('./utils/multitype-mock');
+const replacement = require('./replacement');
+const multitype = require('./multitype');
 
 const script = fs.readFileSync(path.resolve('bundle.js'));
 
@@ -40,7 +40,7 @@ module.exports = function StrategyFactory({ observer, enableIntercept }) {
 			// console.log(`正在访问：${options.protocol}//${options.hostname}:${options.port}`);
 
 			if (contentType && contentType.includes('multipart')) {
-				const mock = await multitypeMock(context, {
+				const mock = await multitype(context, {
 					mockInfoField: '_lemonce_mock_',
 					rescoureServer: Object.assign({}, observer, { apiMockFilePrefix: '/api/file' })
 				});
@@ -145,15 +145,29 @@ module.exports = function StrategyFactory({ observer, enableIntercept }) {
 			
 
 			if (isGzip) {
-				bodyData = zlib.gunzip(bodyData);
+				bodyData = await new Promise((resolve, reject) => {
+					zlib.gunzip(bodyData, (error, result) => {
+						if (error) {
+							reject(error);
+						}
+
+						resolve(result);
+					});
+				});
 			}
 
 			try {
-				bodyData = await bodyReplace(bodyData, scriptStr, headers);
-				// const a = Buffer.from('');
-				// bodyData = Buffer.concat([bodyData, a], bodyData.length + a.length);
+				bodyData = await replacement(bodyData, scriptStr, headers);
 				if (isGzip) {
-					bodyData = zlib.gzip(bodyData);
+					bodyData = await new Promise((resolve, reject) => {
+						zlib.gzip(bodyData, (error, result) => {
+							if (error) {
+								reject(error);
+							}
+	
+							resolve(result);
+						});
+					});
 				}
 
 				context.response.body = bodyData;
