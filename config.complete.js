@@ -32,6 +32,7 @@ const logHandler = log => console.log(log);
 
 module.exports = {
 	observer: 'http://localhost:8080',
+	tracker: 'http://localhost:8080',
 	ssl: {
 		rootCA,
 		enableIntercept: true

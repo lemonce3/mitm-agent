@@ -4,7 +4,7 @@ const path = require('path');
 const replacement = require('./replacement');
 const multitype = require('./multitype');
 
-const script = fs.readFileSync(path.resolve('bundle.js'));
+// const script = fs.readFileSync(path.resolve('bundle.js'));
 
 const httpUtil = {
 	isHtmlHeader(headers) {
@@ -27,8 +27,9 @@ function getReadableData(readableStream) {
 	});
 }
 
-module.exports = function StrategyFactory({ observer, enableIntercept }) {
-	const scriptStr = `<script>\r\nwindow.__OBSERVER_URL__='//${observer.hostname}:${observer.port}';${script}\r\n</script>`;
+module.exports = function StrategyFactory({ observer, tracker, enableIntercept }) {
+	// const scriptStr = `<script>\r\nwindow.__OBSERVER_URL__='//${observer.hostname}:${observer.port}';${script}\r\n</script>`;
+	const scriptStr = '';
 
 	return {
 		async sslConnect(clientRequest, socket, head) {
@@ -49,100 +50,47 @@ module.exports = function StrategyFactory({ observer, enableIntercept }) {
 				context.request.options = mock.options;
 			}
 
-			const forwardRules = [
-				{
-					name: 'observer-forward',
-					protocol: observer.protocol,
-					host: observer.hostname,
-					port: observer.port,
-					test(context) {
-						const headerKey = 'x-observer-forward';
-						const headerValue = 'yes';
+			if (context.request.url.pathname.includes('agent.html')) {
+				context.request.protocol = observer.protocol;
+				context.request.url.hostname = observer.hostname;
+				context.request.url.port = observer.port;
+				context.activeRule = 'fetch-agent';
+			}
 
-						if (context.request.headers[headerKey] === headerValue) {
-							return true;
-						}
+			if (context.request.headers['x-observer-forward'] === 'yes') {
+				context.request.protocol = observer.protocol;
+				context.request.url.hostname = observer.hostname;
+				context.request.url.port = observer.port;
+			}
 
-						return false;
-					},
-					handler(context) {
-						context.request.protocol = this.protocol;
-						context.request.url.hostname = this.host;
-						context.request.url.port = this.port;
-					}
-				},
-				{
-					name: 'tracker-forward',
-					protocol: 'http:',
-					host: 'localhost',
-					port: 8888,
-					test(context) {
-						const headerKey = 'lemonce-mitm';
-						const headerValue = 'forward-action-data';
-
-						if (context.request.headers[headerKey] === headerValue) {
-							return true;
-						}
-
-						return false;
-					},
-					handler(context) {
-						context.request.headers['client-address'] = 'localhost';
-						context.request.headers['user-agent'] = 'aeou';
-						context.request.protocol = this.protocol;
-						context.request.url.hostname = this.host;
-						context.request.url.port = this.port;
-					}
-				},
-				{
-					name: 'fetch-agent',
-					protocol: observer.protocol,
-					host: observer.hostname,
-					port: observer.port,
-					test(context) {
-						if (context.request.url.pathname.includes('agent.html')) {
-							context.activeRule = this.name;
-							return true;
-						}
-
-						return false;
-					},
-					handler(context) {
-						context.request.url.protocol = this.protocol;
-						context.request.url.hostname = this.host;
-						context.request.url.port = this.port;
-					}
-				}
-			];
-
-			forwardRules.forEach(rule => {
-				if (rule.test(context)) {
-					rule.handler(context);
-				}
-			});
+			if (context.request.headers['x-tracker-forward'] === 'yes') {
+				context.request.protocol = tracker.protocol;
+				context.request.url.hostname = tracker.hostname;
+				context.request.url.port = tracker.port;
+			}
 
 			forward();
 		},
 		async response(context, respond) {
 			const { headers, statusCode } = context.response;
-			
+
 			if (statusCode >= 300 && statusCode < 400) {
 				return respond();
 			}
-			
+
 			if (!httpUtil.isHtmlHeader(headers)) {
 				return respond();
 			}
-			
+
 			if (context.activeRule === 'fetch-agent') {
 				return respond();
 			}
-			
+
 			const isGzip = httpUtil.isGzip(headers);
-			
+
 			// return respond();
 			let bodyData = await getReadableData(context.response.body);
-			
+
 
 			if (isGzip) {
 				bodyData = await new Promise((resolve, reject) => {
@@ -164,7 +112,7 @@ module.exports = function StrategyFactory({ observer, enableIntercept }) {
 							if (error) {
 								reject(error);
 							}
-	
+
 							resolve(result);
 						});
 					});
